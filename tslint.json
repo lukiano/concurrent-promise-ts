@@ -1,6 +1,6 @@
 
 {
-  "rulesDirectory": ["tslint-consistent-codestyle", "tslint-eslint-rules", "node_modules/tslint-microsoft-contrib"],
+  "rulesDirectory": ["tslint-consistent-codestyle",  "tslint-eslint-rules", "node_modules/tslint-microsoft-contrib"],
   "rules": {
     "array-type": [
       true,
@@ -11,13 +11,6 @@
     "class-name": true,
     "curly": true,
     "eofline": true,
-    "function-name": [
-      true,
-      {
-        "private-method-regex": "^_.+$",
-        "static-method-regex": "^.+$"
-      }
-    ],
     "indent": [
       true,
       "spaces"
@@ -68,7 +61,7 @@
       "allow-named-functions"
     ],
     "prefer-const": true,
-    "promise-must-complete": true,
+    "promise-must-complete": false,
     "quotemark": [
       true,
       "single",
