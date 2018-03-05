@@ -1,4 +1,4 @@
-import {buildResult} from './util';
+import {AsyncIterator, buildResult, defined} from './util';
 
 type Consumer<T> = {
   resolve: (t: IteratorResult<T>) => void;
@@ -172,8 +172,4 @@ export class Queue<T, U> implements AsyncIterator<U> {
       console.log(message, ...optionalParams);
     }
   }
-}
-
-function defined<T>(t: T | null | undefined): t is T {
-  return t !== undefined && t !== null;
 }

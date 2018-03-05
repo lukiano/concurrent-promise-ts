@@ -1,4 +1,5 @@
-import {all, execute} from '../lib';
+import {all, execute, AsyncIterable} from '../lib';
+import {retrieveIterator} from '../lib/util';
 
 import * as chaiAsPromised from 'chai-as-promised';
 import * as chai from 'chai';
@@ -204,7 +205,7 @@ describe('execute', () => {
       return n;
     };
     const gen = execute(numberGenerator(), f, concurrency, false);
-    const it = gen[Symbol.asyncIterator]();
+    const it = retrieveIterator(gen);
     await delay(1000);
     let failed = false;
     let finished = false;
@@ -240,7 +241,7 @@ describe('execute', () => {
       return n;
     };
     const gen = execute(numberGenerator(), f, concurrency, false);
-    const it = gen[Symbol.asyncIterator]();
+    const it = retrieveIterator(gen);
     const eagerConsumers = new Array<Promise<IteratorResult<number>>>();
     for (let i = 0; i < 20; i++) {
       eagerConsumers.push(it.next());
@@ -269,7 +270,7 @@ describe('execute', () => {
       return n;
     };
     const gen = execute(numberGenerator(), f, concurrency, false);
-    const it = gen[Symbol.asyncIterator]();
+    const it = retrieveIterator(gen);
     await delay(300);
     const eagerReturnConsumer = await it.return!(42);
     chai.expect(eagerReturnConsumer).to.deep.equal({done: true, value: 0});
@@ -290,7 +291,7 @@ describe('execute', () => {
       return n;
     };
     const gen = execute(numberGenerator(), f, concurrency, false);
-    const it = gen[Symbol.asyncIterator]();
+    const it = retrieveIterator(gen);
     await delay(300);
     const eagerReturnConsumer = await it.throw!(error);
     chai.expect(eagerReturnConsumer).to.deep.equal({done: false, value: 0});

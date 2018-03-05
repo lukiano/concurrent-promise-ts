@@ -1,4 +1,4 @@
-import {errorIterator, iterable2asyncIterable} from '../lib/util';
+import {errorIterator, iterable2asyncIterable, retrieveIterator} from '../lib/util';
 
 import * as chaiAsPromised from 'chai-as-promised';
 import * as chai from 'chai';
@@ -10,26 +10,26 @@ describe('errorIterator', () => {
 
   it('fails on #next()', async () => {
     const error = new Error('boom');
-    const it = errorIterator(error)[Symbol.asyncIterator]();
+    const it = retrieveIterator(errorIterator(error));
     await chai.expect(it.next()).to.be.rejectedWith(error);
   });
 
   it('fails on #return()', async () => {
     const error = new Error('boom');
-    const it = errorIterator(error)[Symbol.asyncIterator]();
+    const it = retrieveIterator(errorIterator(error));
     await chai.expect(it.return!()).to.be.rejectedWith(error);
   });
 
   it('fails on #throw()', async () => {
     const error = new Error('boom');
-    const it = errorIterator(error)[Symbol.asyncIterator]();
+    const it = retrieveIterator(errorIterator(error));
     await chai.expect(it.throw!()).to.be.rejectedWith(error);
   });
 
   it('fails on #throw() with custom error', async () => {
     const error = new Error('boom');
     const throwError = new Error('another boom');
-    const it = errorIterator(error)[Symbol.asyncIterator]();
+    const it = retrieveIterator(errorIterator(error));
     await chai.expect(it.throw!(throwError)).to.be.rejectedWith(throwError);
   });
 
@@ -43,7 +43,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.next(4)).to.eventually.equal(6);
   });
 
@@ -54,7 +54,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.next(4)).to.be.rejectedWith(error);
   });
 
@@ -64,7 +64,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.return!(5)).to.eventually.equal(7);
   });
 
@@ -73,7 +73,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.return!(5)).to.eventually.deep.equal({done: true, value: 5});
   });
 
@@ -84,7 +84,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.return!(5)).to.be.rejectedWith(error);
   });
 
@@ -95,7 +95,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.throw!(throwError)).to.eventually.equal(8);
   });
 
@@ -107,7 +107,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.throw!(throwError)).to.be.rejectedWith(error);
   });
 
@@ -117,7 +117,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.throw!(throwError)).to.be.rejectedWith(throwError);
   });
 
@@ -126,7 +126,7 @@ describe('iterable2asyncIterable', () => {
     const iterable = {
       [Symbol.iterator]: () => iteratorStub.object
     };
-    const it = iterable2asyncIterable(iterable)[Symbol.asyncIterator]();
+    const it = retrieveIterator(iterable2asyncIterable(iterable));
     await chai.expect(it.throw!()).to.eventually.deep.equal({done: true, value: undefined});
   });
 

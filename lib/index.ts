@@ -1,7 +1,9 @@
-import {accumulate, errorIterator, isAsyncIterable, isIterable, iterable2asyncIterable} from './util';
+import {AsyncIterable, AsyncIterator, accumulate, errorIterator, isAsyncIterable, isIterable, iterable2asyncIterable, retrieveIterator, makeIterator} from './util';
 import {Queue} from './queue';
 
-(Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for('asyncIterator');
+export {AsyncIterable, AsyncIterator};
+
+(<any>Symbol).asyncIterator = (<any>Symbol).asyncIterator || Symbol.for('asyncIterator');
 
 /**
  *
@@ -14,7 +16,7 @@ import {Queue} from './queue';
 export function all<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => Promise<U>, concurrency = 32, backPressure = false): Promise<Array<U>> {
   const results = new Array<U>();
   const gen = execute(it, f, concurrency, backPressure);
-  return accumulate(gen[Symbol.asyncIterator](), results).then(() => results);
+  return accumulate(retrieveIterator(gen), results).then(() => results);
 }
 
 /**
@@ -34,12 +36,10 @@ export function execute<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => P
     it = iterable2asyncIterable(it);
   }
   if (isAsyncIterable(it)) {
-    return {
-      [Symbol.asyncIterator](): AsyncIterator<U> {
-        const gen = it as AsyncIterable<T>;
-        return new Queue(gen[Symbol.asyncIterator](), f, concurrency, backPressure);
-      }
-    };
+    return makeIterator(() => {
+      const gen = it as AsyncIterable<T>;
+      return new Queue(retrieveIterator(gen), f, concurrency, backPressure);
+    });
   }
 
   // Return failure iterator
