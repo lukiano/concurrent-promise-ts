@@ -28,9 +28,6 @@ export class Queue<T, U> implements AsyncIterator<U> {
     private readonly _f: (t: T) => Promise<U>,
     private readonly _concurrency: number,
     private readonly _backPressure: boolean) {
-    if (this._concurrency <= 0) {
-      throw new Error('Invalid concurrency value');
-    }
     if (!this._backPressure) {
       this._tryToFireMoreWork();
     }
@@ -41,12 +38,12 @@ export class Queue<T, U> implements AsyncIterator<U> {
   }
 
   // finish iterator and ignore remaining results
-  return?(value?: U): Promise<IteratorResult<U>> {
+  return(value?: U): Promise<IteratorResult<U>> {
     this._producerFinished = true;
-    return this._doNext(value).then((result) => buildResult(true, result.value ? result.value : value));
+    return this._doNext(value).then((result) => buildResult(true, result.value !== undefined ? result.value : value));
   }
 
-  throw?(_e?: any): Promise<IteratorResult<U>> {
+  throw(_e?: any): Promise<IteratorResult<U>> {
     // We don't pass the throw to the original generator.
     // throw does not finish the iteration.
     return this.next();
@@ -130,16 +127,19 @@ export class Queue<T, U> implements AsyncIterator<U> {
       const waitingConsumer = this._waitingConsumers.shift()!;
       this._log('returning result to waiting consumer', result);
       waitingConsumer.resolve(result);
+      if (this._producerFinished && this._waitingConsumers.length > 0 && this._producersInProgress === 0) {
+        this._producerHasFinished();
+      }
       return;
     }
     if (defined(result.value)) {
       this._log('adding result to ready array', result);
       this._resultsReadyToConsume.push(new Success(result.value));
+
     }
     if (result.done) {
       this._producerHasFinished();
     }
-
   }
 
   private _producerError(err: Error): void {
@@ -158,6 +158,7 @@ export class Queue<T, U> implements AsyncIterator<U> {
   private _producerHasFinished(): void {
     this._log('producer finished');
     this._producerFinished = true;
+    this._log('finish waiting consumers', this._producersInProgress, this._waitingConsumers.length);
     if (this._producersInProgress === 0) {
       while (this._waitingConsumers.length > 0) {
         const waitingConsumer = this._waitingConsumers.shift()!;

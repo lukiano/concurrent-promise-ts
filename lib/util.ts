@@ -3,11 +3,11 @@ export function buildResult<T>(done: boolean, value?: T): IteratorResult<T> {
 }
 
 export function isAsyncIterable<T>(it: any): it is AsyncIterable<T> {
-  return typeof it[Symbol.asyncIterator] === 'function';
+  return it && typeof it[Symbol.asyncIterator] === 'function';
 }
 
 export function isIterable<T>(it: any): it is Iterable<T> {
-  return typeof it[Symbol.iterator] === 'function';
+  return it && typeof it[Symbol.iterator] === 'function';
 }
 
 export function iterable2asyncIterable<T>(it: Iterable<T>): AsyncIterable<T> {
@@ -40,8 +40,33 @@ export function iterable2asyncIterable<T>(it: Iterable<T>): AsyncIterable<T> {
               return Promise.reject(err);
             }
           }
-          return Promise.resolve(buildResult(true));
+          return e ? Promise.reject(e) : Promise.resolve(buildResult(true));
         }
+      };
+    }
+  };
+}
+
+
+export function accumulate<U>(ait: AsyncIterator<U>, results: Array<U>): Promise<void> {
+  return ait.next().then((result) => {
+    if (result.value) {
+      results.push(result.value);
+    }
+    if (!result.done) {
+      return accumulate(ait, results);
+    }
+    return Promise.resolve();
+  });
+}
+
+export function errorIterator(err: Error): AsyncIterable<never> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<never> {
+      return {
+        next: () => Promise.reject(err),
+        return: () => Promise.reject(err),
+        throw: (e?: Error) => e ? Promise.reject(e) : Promise.reject(err)
       };
     }
   };
