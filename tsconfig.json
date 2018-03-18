@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "allowJs": false,
+    "declaration": true,
     "baseUrl": "lib",
     "module": "commonjs",
     "noFallthroughCasesInSwitch": true,
