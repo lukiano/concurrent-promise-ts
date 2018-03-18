@@ -3,3 +3,5 @@ tslint.json
 tsfmt.json
 coverage
 bitbucket-pipelines.yml
+test/
+out/test/

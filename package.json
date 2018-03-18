@@ -1,6 +1,6 @@
 {
   "name": "concurrent-promise-ts",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "An efficient promise executor",
   "author": "Luciano Leggieri",
   "license": "BSD-3-Clause",
@@ -50,6 +50,6 @@
     "typescript": "^2.7.2",
     "typescript-formatter": "^7.1.0"
   },
-  "main": "out/index.js",
+  "main": "out/lib/index.js",
   "typings": "./out/lib/index.d.ts"
 }
