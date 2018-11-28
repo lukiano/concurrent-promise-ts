@@ -1,133 +1,151 @@
-import {errorIterator, iterable2asyncIterable, retrieveIterator} from '../lib/util';
+import {errorIterator, _execute} from '../lib/util';
 
 import * as chaiAsPromised from 'chai-as-promised';
 import * as chai from 'chai';
-import {SinonTyped} from 'sinon-typed';
+import * as util from 'util';
 
 chai.use(chaiAsPromised);
+
+function delay(ms: number): Promise<void> {
+  return util.promisify(setTimeout)(ms);
+}
 
 describe('errorIterator', () => {
 
   it('fails on #next()', async () => {
     const error = new Error('boom');
-    const it = retrieveIterator(errorIterator(error));
+    const it = errorIterator(error);
     await chai.expect(it.next()).to.be.rejectedWith(error);
   });
 
   it('fails on #return()', async () => {
     const error = new Error('boom');
-    const it = retrieveIterator(errorIterator(error));
+    const it = errorIterator(error);
     await chai.expect(it.return!()).to.be.rejectedWith(error);
   });
 
   it('fails on #throw()', async () => {
     const error = new Error('boom');
-    const it = retrieveIterator(errorIterator(error));
+    const it = errorIterator(error);
     await chai.expect(it.throw!()).to.be.rejectedWith(error);
   });
 
   it('fails on #throw() with custom error', async () => {
     const error = new Error('boom');
     const throwError = new Error('another boom');
-    const it = retrieveIterator(errorIterator(error));
+    const it = errorIterator(error);
     await chai.expect(it.throw!(throwError)).to.be.rejectedWith(throwError);
   });
 
 });
 
-describe('iterable2asyncIterable', () => {
+describe('_execute', () => {
 
-  it('forwards #next()', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    iteratorStub.stubMethod('next').withArgs(4).returns(6);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
-    };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.next(4)).to.eventually.equal(6);
-  });
-
-  it('catches #next() errors', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
+  it('ahead of time does not swallow errors', async () => {
+    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
+    const concurrency = 10;
     const error = new Error('boom');
-    iteratorStub.stubMethod('next').withArgs(4).throws(error);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
+    const actualValues = new Array<number>();
+    async function* numberGenerator(): AsyncIterable<number> {
+      for (const value of tenNumbers) {
+        await delay(50);
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(100);
+      if (n === 5) {
+        throw error;
+      }
+      return n;
     };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.next(4)).to.be.rejectedWith(error);
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    let failed = false;
+    let finished = false;
+    while (!failed && !finished) {
+      try {
+        const value = await it.next();
+        finished = value.done;
+        if (value.value !== undefined) {
+          actualValues.push(value.value);
+        }
+      } catch (err) {
+        failed = true;
+      }
+    }
+    if (!failed) {
+      chai.expect.fail('Expected asynchronous generator iteration to fail');
+    }
+    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal([0, 1, 2, 3, 4]);
   });
 
-  it('forwards #return()', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    iteratorStub.stubMethod('return').withArgs(5).returns(7);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
+  it('supports eager consumers', async () => {
+    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
+    const concurrency = 5;
+    const actualValues = new Array<number>();
+    async function* numberGenerator(): AsyncIterable<number> {
+      for (const value of tenNumbers) {
+        await delay(50);
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
     };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.return!(5)).to.eventually.equal(7);
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    const eagerConsumers = new Array<Promise<IteratorResult<number>>>();
+    for (let i = 0; i < 20; i++) {
+      eagerConsumers.push(it.next());
+    }
+    const results = await Promise.all(eagerConsumers);
+    results.forEach((result) => {
+      if (result.value !== undefined) {
+        actualValues.push(result.value);
+      }
+    });
+
+    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal(tenNumbers);
   });
 
-  it('returns value if #return() is not defined', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
+  it('supports eager return consumer', async () => {
+    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
+    const concurrency = 5;
+    async function* numberGenerator(): AsyncIterable<number> {
+      for (const value of tenNumbers) {
+        await delay(50);
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
     };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.return!(5)).to.eventually.deep.equal({done: true, value: 5});
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    const eagerReturnConsumer = await it.return!(42);
+    chai.expect(eagerReturnConsumer).to.deep.equal({done: true, value: 0});
   });
 
-  it('catches #return() errors', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
+  it('supports eager throwing consumer', async () => {
+    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
+    const concurrency = 5;
     const error = new Error('boom');
-    iteratorStub.stubMethod('return').withArgs(5).throws(error);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
+    async function* numberGenerator(): AsyncIterable<number> {
+      for (const value of tenNumbers) {
+        await delay(50);
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
     };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.return!(5)).to.be.rejectedWith(error);
-  });
-
-  it('forwards #throw()', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    const throwError = new Error('another boom');
-    iteratorStub.stubMethod('throw').withArgs(throwError).returns(8);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
-    };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.throw!(throwError)).to.eventually.equal(8);
-  });
-
-  it('catches #throw() errors', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    const error = new Error('boom');
-    const throwError = new Error('another boom');
-    iteratorStub.stubMethod('throw').withArgs(throwError).throws(error);
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
-    };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.throw!(throwError)).to.be.rejectedWith(error);
-  });
-
-  it('rethrows error if #throw() is not defined', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    const throwError = new Error('another boom');
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
-    };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.throw!(throwError)).to.be.rejectedWith(throwError);
-  });
-
-  it('finished iterator if #throw() is not defined', async () => {
-    const iteratorStub = SinonTyped.stub<Iterator<number>>();
-    const iterable = {
-      [Symbol.iterator]: () => iteratorStub.object
-    };
-    const it = retrieveIterator(iterable2asyncIterable(iterable));
-    await chai.expect(it.throw!()).to.eventually.deep.equal({done: true, value: undefined});
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    const eagerReturnConsumer = await it.throw!(error);
+    chai.expect(eagerReturnConsumer).to.deep.equal({done: false, value: 0});
   });
 
 });

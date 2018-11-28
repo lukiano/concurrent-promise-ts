@@ -1,8 +1,8 @@
-import {AsyncIterator, buildResult, defined} from './util';
+import {buildResult, defined} from './util';
 
 type Consumer<T> = {
   resolve: (t: IteratorResult<T>) => void;
-  reject: (err: Error) => void;
+  reject: (err: unknown) => void;
 };
 
 class Success<T> {
@@ -10,7 +10,7 @@ class Success<T> {
 }
 
 class Failure {
-  constructor(public readonly err: Error) {}
+  constructor(public readonly err: unknown) {}
 }
 
 type Try<T> = Success<T> | Failure;
@@ -22,14 +22,17 @@ export class Queue<T, U> implements AsyncIterator<U> {
   private readonly _waitingConsumers = new Array<Consumer<U>>();
   private readonly _nextValues = Array<any>();
   private _producerFinished = false;
-  private _logEnabled = false;
 
-  constructor(private readonly _ait: AsyncIterator<T>,
+  constructor(private readonly _ait: AsyncIterator<T> | undefined,
+    private readonly _it: Iterator<T> | undefined,
     private readonly _f: (t: T) => Promise<U>,
     private readonly _concurrency: number,
     private readonly _backPressure: boolean) {
     if (!this._backPressure) {
       this._tryToFireMoreWork();
+    }
+    if (!this._ait && !this._it) {
+      throw new Error('Iterator not set');
     }
   }
 
@@ -38,9 +41,10 @@ export class Queue<T, U> implements AsyncIterator<U> {
   }
 
   // finish iterator and ignore remaining results
-  return(value?: U): Promise<IteratorResult<U>> {
+  async return(value?: U): Promise<IteratorResult<U>> {
     this._producerFinished = true;
-    return this._doNext(value).then((result) => buildResult(true, result.value !== undefined ? result.value : value));
+    const result = await this._doNext(value);
+    return buildResult(true, result.value !== undefined ? result.value : value);
   }
 
   throw(_e?: any): Promise<IteratorResult<U>> {
@@ -49,18 +53,9 @@ export class Queue<T, U> implements AsyncIterator<U> {
     return this.next();
   }
 
-  private _invarianceCheck(): void {
-    if (this._resultsReadyToConsume.length > 0 && this._waitingConsumers.length > 0) {
-      this._producerError(new Error('Invariance failed'));
-    }
-  }
-
   private _doNext(value?: any): Promise<IteratorResult<U>> {
-    this._invarianceCheck();
-
     if (this._resultsReadyToConsume.length > 0) {
       const result = this._resultsReadyToConsume.shift()!;
-      this._log('I will consume', result);
       this._nextValues.push(value);
       this._tryToFireMoreWork();
       if (result instanceof Success) {
@@ -70,10 +65,8 @@ export class Queue<T, U> implements AsyncIterator<U> {
       }
     }
     if (this._producerFinished && this._producersInProgress === 0) {
-      this._log('I want to consume but producer finished is true');
       return Promise.resolve(buildResult(true));
     }
-    this._log('I want to consume but there is nothing to consume');
     return new Promise<IteratorResult<U>>((resolve, reject) => {
       this._waitingConsumers.push({resolve, reject});
       this._nextValues.push(value);
@@ -86,30 +79,29 @@ export class Queue<T, U> implements AsyncIterator<U> {
       ? this._resultsReadyToConsume.length + this._producersInProgress
       : this._producersInProgress;
     if (resultsWaitingToBeConsumed < this._concurrency && !this._producerFinished) {
-      this._log('starting work');
       this._startWork(this._nextValues.shift());
-      setImmediate(() => this._tryToFireMoreWork());
+      // setImmediate(() => this._tryToFireMoreWork());
     }
   }
 
-  private _startWork(value?: any): void {
+  private async _startWork(value?: any): Promise<void> {
     this._producersInProgress++;
-    this._ait.next(value).then((result) => {
-      this._log('received value from source', result);
+    try {
+      const result = this._ait ? await this._ait.next(value) : this._it!.next(value);
       if (defined(result.value)) {
-        return this._f(result.value).then((newValue) => buildResult(result.done, newValue));
+        const newValue = await this._f(result.value);
+        this._producersInProgress--;
+        this._addResult(buildResult(result.done, newValue));
       } else {
-        return buildResult(result.done, result.value);
+        this._producersInProgress--;
+        this._addResult(buildResult<U>(result.done, undefined));
       }
-    }).then((result: IteratorResult<U>) => {
-      this._producersInProgress--;
-      this._addResult(result);
-      this._tryToFireMoreWork();
-    }, (err: Error) => {
+    } catch (err) {
       this._producersInProgress--;
       this._producerError(err);
+    } finally {
       this._tryToFireMoreWork();
-    });
+    }
   }
 
   private _addResult(result: IteratorResult<U>): void {
@@ -125,40 +117,33 @@ export class Queue<T, U> implements AsyncIterator<U> {
         }
       }
       const waitingConsumer = this._waitingConsumers.shift()!;
-      this._log('returning result to waiting consumer', result);
       waitingConsumer.resolve(result);
       if (this._producerFinished && this._waitingConsumers.length > 0 && this._producersInProgress === 0) {
         this._producerHasFinished();
       }
       return;
-    }
-    if (defined(result.value)) {
-      this._log('adding result to ready array', result);
-      this._resultsReadyToConsume.push(new Success(result.value));
-
-    }
-    if (result.done) {
-      this._producerHasFinished();
+    } else {
+      if (defined(result.value)) {
+        this._resultsReadyToConsume.push(new Success(result.value));
+      }
+      if (result.done) {
+        this._producerHasFinished();
+      }
     }
   }
 
-  private _producerError(err: Error): void {
+  private _producerError(err: unknown): void {
     if (this._waitingConsumers.length > 0) {
-      this._log('returning error to waiting consumer', err.message);
       const waitingConsumer = this._waitingConsumers.shift()!;
       waitingConsumer.reject(err);
     } else {
-      this._log('adding error to ready array', err.message);
       this._resultsReadyToConsume.push(new Failure(err));
     }
     this._producerHasFinished();
-    this._log(`Producer or mapper function failed with ${err.message}`);
   }
 
   private _producerHasFinished(): void {
-    this._log('producer finished');
     this._producerFinished = true;
-    this._log('finish waiting consumers', this._producersInProgress, this._waitingConsumers.length);
     if (this._producersInProgress === 0) {
       while (this._waitingConsumers.length > 0) {
         const waitingConsumer = this._waitingConsumers.shift()!;
@@ -167,9 +152,4 @@ export class Queue<T, U> implements AsyncIterator<U> {
     }
   }
 
-  private _log(message?: any, ...optionalParams: Array<any>): void {
-    if (this._logEnabled) {
-      console.log(message, ...optionalParams);
-    }
-  }
 }
