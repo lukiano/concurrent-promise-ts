@@ -105,7 +105,7 @@ describe('_execute', () => {
     expect(actualValues.sort((a, b) => a - b)).toEqual(tenNumbers);
   });
 
-  it('supports eager return consumer', async () => {
+  it('supports eager return consumer with a value', async () => {
     const concurrency = 5;
     async function* numberGenerator(): AsyncIterable<number> {
       for (const value of tenNumbers) {
@@ -120,7 +120,52 @@ describe('_execute', () => {
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
     const eagerReturnConsumer = await it.return!(42);
+    expect(eagerReturnConsumer).toEqual({done: true, value: 42});
+  });
+
+  it('supports eager return consumer with no value', async () => {
+    const concurrency = 5;
+    async function* numberGenerator(): AsyncIterable<number> {
+      for (const value of tenNumbers) {
+        await delay(50);
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    const eagerReturnConsumer = await it.return!();
     expect(eagerReturnConsumer).toEqual({done: true, value: 0});
+  });
+
+  it('supports eager return consumer with backpressure', async () => {
+    const concurrency = 10;
+    let lastStatementReached = false;
+    async function* numberGenerator(): AsyncIterable<number> {
+      try {
+        for (const value of tenNumbers) {
+          await delay(10);
+          console.log(value);
+          yield value;
+        }
+      } finally {
+        lastStatementReached = true;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(1000);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(10);
+    await it.next();
+    await delay(100);
+    await it.return!();
+    await delay(1000);
+    expect(lastStatementReached).toBe(false);
   });
 
   it('supports eager throwing consumer', async () => {
