@@ -1,11 +1,7 @@
-import * as chaiAsPromised from 'chai-as-promised';
-import * as chai from 'chai';
 import * as util from 'util';
 
 import {all, execute} from '../lib';
 import {makeIterator} from '../lib/util';
-
-chai.use(chaiAsPromised);
 
 function delay(ms: number): Promise<void> {
   return util.promisify(setTimeout)(ms);
@@ -17,17 +13,17 @@ describe('all', () => {
 
   it('with no delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve(n)), 3);
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('with 50ms delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3);
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('with default concurrency', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)));
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('does not swallow errors', async () => {
@@ -40,12 +36,12 @@ describe('all', () => {
       return n;
     };
     const promise = all([1, 2, 3, 4, 5, 6], f, 3);
-    await chai.expect(promise).to.be.rejectedWith(error);
+    await expect(promise).rejects.toBe(error);
   });
 
   it('fails with invalid concurrency argument', async () => {
     const promise = all([1, 2, 3, 4, 5, 6], (n) => Promise.resolve(n), -1);
-    await chai.expect(promise).to.be.rejectedWith(Error, 'Invalid concurrency value');
+    await expect(promise).rejects.toThrow('Invalid concurrency value');
   });
 
 
@@ -58,7 +54,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve(n)), 3, false)) {
       actualValues.push(value);
     }
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('with 50ms delay', async () => {
@@ -66,7 +62,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3, false)) {
       actualValues.push(value);
     }
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('with default concurrency', async () => {
@@ -74,7 +70,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)))) {
       actualValues.push(value);
     }
-    chai.expect(actualValues).to.deep.equal([1, 2, 3, 4, 5, 6]);
+    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('respects concurrency maximum value', async () => {
@@ -95,8 +91,8 @@ describe('execute', () => {
     for await (const value of execute(values, f, concurrency, false)) {
       actualValues.push(value);
     }
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal(values);
-    chai.expect(exceededLimit).to.be.false;
+    expect(actualValues.sort((a, b) => a - b)).toEqual(values);
+    expect(exceededLimit).toBe(false);
   });
 
   it('achieves optimum concurrency', async () => {
@@ -122,9 +118,9 @@ describe('execute', () => {
     for await (const value of execute(values, f, concurrency, false)) {
       actualValues.push(value);
     }
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal(values);
-    chai.expect(concurrencyReached).to.be.true;
-    chai.expect(concurrencyReduced).to.be.false;
+    expect(actualValues.sort((a, b) => a - b)).toEqual(values);
+    expect(concurrencyReached).toBe(true);
+    expect(concurrencyReduced).toBe(false);
   });
 
   it('exercises back pressure', async () => {
@@ -151,8 +147,8 @@ describe('execute', () => {
       actualValues.push(value);
     }
     await delay(1);
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal(tenNumbers);
-    chai.expect(tooMuchPressure).to.be.false;
+    expect(actualValues.sort((a, b) => a - b)).toEqual(tenNumbers);
+    expect(tooMuchPressure).toBe(false);
   });
 
   it('back pressure does not swallow errors', async () => {
@@ -176,20 +172,20 @@ describe('execute', () => {
       for await (const value of execute(numberGenerator(), f, concurrency, true)) {
         actualValues.push(value);
       }
-      chai.expect.fail('Expected asynchronous generator iteration to fail');
+      fail('Expected asynchronous generator iteration to fail');
     } catch (err) {
       if (err.message !== 'boom') {
         throw err;
       }
     }
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal([0, 1, 2, 3, 4]);
+    expect(actualValues.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('handles invalid arguments', async () => {
     try {
       for await (const _ignored of execute(undefined as any as Array<number>, ((n) => delay(100).then(() => n)), 3, false)) {
       }
-      chai.expect.fail('Expected asynchronous generator iteration to fail');
+      fail('Expected asynchronous generator iteration to fail');
     } catch (err) {
       if (err.message !== 'Unrecognized source of data') {
         throw err;
@@ -212,7 +208,7 @@ describe('execute', () => {
     const it = execute(ait, f);
     await delay(1);
     for await (const value of it) {
-      chai.expect(value).to.equal(42);
+      expect(value).toEqual(42);
     }
   });
 

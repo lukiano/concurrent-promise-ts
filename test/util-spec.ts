@@ -1,10 +1,6 @@
 import {errorIterator, _execute} from '../lib/util';
 
-import * as chaiAsPromised from 'chai-as-promised';
-import * as chai from 'chai';
 import * as util from 'util';
-
-chai.use(chaiAsPromised);
 
 function delay(ms: number): Promise<void> {
   return util.promisify(setTimeout)(ms);
@@ -17,26 +13,26 @@ describe('errorIterator', () => {
   it('fails on #next()', async () => {
     const error = new Error('boom');
     const it = errorIterator(error);
-    await chai.expect(it.next()).to.be.rejectedWith(error);
+    await expect(it.next()).rejects.toBe(error);
   });
 
   it('fails on #return()', async () => {
     const error = new Error('boom');
     const it = errorIterator(error);
-    await chai.expect(it.return!()).to.be.rejectedWith(error);
+    await expect(it.return!()).rejects.toBe(error);
   });
 
   it('fails on #throw()', async () => {
     const error = new Error('boom');
     const it = errorIterator(error);
-    await chai.expect(it.throw!()).to.be.rejectedWith(error);
+    await expect(it.throw!()).rejects.toBe(error);
   });
 
   it('fails on #throw() with custom error', async () => {
     const error = new Error('boom');
     const throwError = new Error('another boom');
     const it = errorIterator(error);
-    await chai.expect(it.throw!(throwError)).to.be.rejectedWith(throwError);
+    await expect(it.throw!(throwError)).rejects.toBe(throwError);
   });
 
 });
@@ -76,9 +72,9 @@ describe('_execute', () => {
       }
     }
     if (!failed) {
-      chai.expect.fail('Expected asynchronous generator iteration to fail');
+      fail('Expected asynchronous generator iteration to fail');
     }
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal([0, 1, 2, 3, 4]);
+    expect(actualValues.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('supports eager consumers', async () => {
@@ -106,7 +102,7 @@ describe('_execute', () => {
       }
     });
 
-    chai.expect(actualValues.sort((a, b) => a - b)).to.deep.equal(tenNumbers);
+    expect(actualValues.sort((a, b) => a - b)).toEqual(tenNumbers);
   });
 
   it('supports eager return consumer', async () => {
@@ -124,7 +120,7 @@ describe('_execute', () => {
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
     const eagerReturnConsumer = await it.return!(42);
-    chai.expect(eagerReturnConsumer).to.deep.equal({done: true, value: 0});
+    expect(eagerReturnConsumer).toEqual({done: true, value: 0});
   });
 
   it('supports eager throwing consumer', async () => {
@@ -143,7 +139,7 @@ describe('_execute', () => {
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
     const eagerReturnConsumer = await it.throw!(error);
-    chai.expect(eagerReturnConsumer).to.deep.equal({done: false, value: 0});
+    expect(eagerReturnConsumer).toEqual({done: false, value: 0});
   });
 
 });

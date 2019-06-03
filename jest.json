@@ -4,11 +4,10 @@
   "silent": false,
   "testEnvironment": "node",
   "roots": [
+    "<rootDir>/lib",
     "<rootDir>/test"
   ],
-  "testMatch": [
-    "**/?(*.)+(spec|test|unit|e2e).ts"
-  ],
+  "testRegex": ".+\\-spec\\.ts$",
   "transform": {
     "^.+\\.ts$": "ts-jest"
   },
@@ -20,15 +19,15 @@
   "collectCoverage": true,
   "coverageThreshold": {
     "global": {
-      "statements": 50,
-      "branches": 30,
-      "lines": 60,
-      "functions": 40
+      "statements": 100,
+      "branches": 98,
+      "lines": 100,
+      "functions": 100
     }
   },
   "cacheDirectory": "<rootDir>/.jest",
   "collectCoverageFrom": [
-    "src/**/*.ts",
+    "lib/**/*.ts",
     "!test/utils.ts",
     "!**/node_modules/**"
   ]
