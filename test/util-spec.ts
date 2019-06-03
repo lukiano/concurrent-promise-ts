@@ -10,6 +10,8 @@ function delay(ms: number): Promise<void> {
   return util.promisify(setTimeout)(ms);
 }
 
+const tenNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 describe('errorIterator', () => {
 
   it('fails on #next()', async () => {
@@ -42,7 +44,6 @@ describe('errorIterator', () => {
 describe('_execute', () => {
 
   it('ahead of time does not swallow errors', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 10;
     const error = new Error('boom');
     const actualValues = new Array<number>();
@@ -81,7 +82,6 @@ describe('_execute', () => {
   });
 
   it('supports eager consumers', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 5;
     const actualValues = new Array<number>();
     async function* numberGenerator(): AsyncIterable<number> {
@@ -110,7 +110,6 @@ describe('_execute', () => {
   });
 
   it('supports eager return consumer', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 5;
     async function* numberGenerator(): AsyncIterable<number> {
       for (const value of tenNumbers) {
@@ -129,7 +128,6 @@ describe('_execute', () => {
   });
 
   it('supports eager throwing consumer', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 5;
     const error = new Error('boom');
     async function* numberGenerator(): AsyncIterable<number> {

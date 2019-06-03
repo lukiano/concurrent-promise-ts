@@ -11,6 +11,8 @@ function delay(ms: number): Promise<void> {
   return util.promisify(setTimeout)(ms);
 }
 
+const tenNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 describe('all', () => {
 
   it('with no delay', async () => {
@@ -79,7 +81,7 @@ describe('execute', () => {
     const actualValues = new Array<number>();
     const concurrency = 17;
     let inFlight = 0;
-    const values = Array.apply(null, {length: 100}).map(Function.call, Number);
+    const values = [...Array(100).keys()];
     let exceededLimit = false;
     const f = async (n: number) => {
       if (inFlight > concurrency) {
@@ -102,7 +104,7 @@ describe('execute', () => {
     const concurrency = 17;
     let inFlight = 0;
     const deviationAllowed = 3;
-    const values = Array.apply(null, {length: 100}).map(Function.call, Number);
+    const values = [...Array(100).keys()];
     let concurrencyReached = false;
     let concurrencyReduced = false;
     const f = async (n: number) => {
@@ -126,7 +128,6 @@ describe('execute', () => {
   });
 
   it('exercises back pressure', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 1;
     const actualValues = new Array<number>();
     async function* numberGenerator(): AsyncIterable<number> {
@@ -155,7 +156,6 @@ describe('execute', () => {
   });
 
   it('back pressure does not swallow errors', async () => {
-    const tenNumbers = Array.apply(null, {length: 10}).map(Function.call, Number);
     const concurrency = 1;
     const error = new Error('boom');
     const actualValues = new Array<number>();
