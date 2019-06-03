@@ -23,7 +23,7 @@
     "lint": "tslint --project './tsconfig.json' -c tslint.json",
     "verify-formatted": "tsfmt --verify",
     "pretest": "npm run build",
-    "test-only": "jest -c jest.json --no-watchman",
+    "test-only": "jest -c jest.json --no-watchman --run-in-band",
     "test": "npm run test-only",
     "precoverage": "npm run build",
     "coveralls": "cat ./coverage/lcov.info | node node_modules/.bin/coveralls"
@@ -42,5 +42,6 @@
     "typescript-formatter": "^7.2.2"
   },
   "main": "out/lib/index.js",
-  "typings": "./out/lib/index.d.ts"
+  "typings": "./out/lib/index.d.ts",
+  "dependencies": {}
 }

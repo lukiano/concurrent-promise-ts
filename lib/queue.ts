@@ -56,9 +56,16 @@ export class Queue<T, U> implements AsyncIterator<U> {
     return buildResult(true, value !== undefined ? value : result.value);
   }
 
-  throw(_e?: any): Promise<IteratorResult<U>> {
-    // We don't pass the throw to the original generator.
-    // throw does not finish the iteration.
+  async throw(value?: any): Promise<IteratorResult<U>> {
+    if (this._ait) {
+      if (this._ait.throw) {
+        await this._ait.throw(value);
+      }
+    } else {
+      if (this._it!.throw) {
+        this._it!.throw(value);
+      }
+    }
     return this.next();
   }
 

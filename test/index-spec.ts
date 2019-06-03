@@ -39,6 +39,19 @@ describe('all', () => {
     await expect(promise).rejects.toBe(error);
   });
 
+  it('does not swallow errors at full concurrency', async () => {
+    const error = new Error('boom');
+    const f = async (n: number) => {
+      await delay(50);
+      if (n === 5) {
+        throw error;
+      }
+      return n;
+    };
+    const promise = all([1, 2, 3, 4, 5, 6], f);
+    await expect(promise).rejects.toBe(error);
+  });
+
   it('fails with invalid concurrency argument', async () => {
     const promise = all([1, 2, 3, 4, 5, 6], (n) => Promise.resolve(n), -1);
     await expect(promise).rejects.toThrow('Invalid concurrency value');
@@ -210,6 +223,42 @@ describe('execute', () => {
     for await (const value of it) {
       expect(value).toEqual(42);
     }
+  });
+
+  it('exercises break with back pressure', async () => {
+    const concurrency = 2;
+    const actualValues = new Array<number>();
+    let lastStatementReached = false;
+    async function* numberGenerator(): AsyncIterable<number> {
+      try {
+        for (const value of tenNumbers) {
+          await delay(50);
+          yield value;
+        }
+      } finally {
+        lastStatementReached = true;
+      }
+    }
+    let inFlight = 0;
+    let tooMuchPressure = false;
+    const f = async (n: number) => {
+      if (inFlight > 1) {
+        tooMuchPressure = true;
+      }
+      inFlight++;
+      await delay(50);
+      inFlight--;
+      return n;
+    };
+    for await (const value of execute(numberGenerator(), f, concurrency, true)) {
+      actualValues.push(value);
+      if (value === 5) {
+        break;
+      }
+    }
+    await delay(1);
+    expect(lastStatementReached).toBe(true);
+    expect(tooMuchPressure).toBe(false);
   });
 
 });

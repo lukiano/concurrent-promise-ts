@@ -119,8 +119,8 @@ describe('_execute', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
-    const eagerReturnConsumer = await it.return!(42);
-    expect(eagerReturnConsumer).toEqual({done: true, value: 42});
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.return!(42)).resolves.toEqual({done: true, value: 42});
   });
 
   it('supports eager return consumer with no value', async () => {
@@ -137,8 +137,8 @@ describe('_execute', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
-    const eagerReturnConsumer = await it.return!();
-    expect(eagerReturnConsumer).toEqual({done: true, value: 0});
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.return!()).resolves.toEqual({done: true, value: 1});
   });
 
   it('supports eager return consumer with backpressure', async () => {
@@ -160,9 +160,9 @@ describe('_execute', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(10);
-    await it.next();
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
     await delay(100);
-    await it.return!();
+    await expect(it.return!()).resolves.toEqual({done: true, value: 1});
     await delay(100);
     expect(lastStatementReached).toBe(true);
   });
@@ -190,9 +190,9 @@ describe('_execute', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(10);
-    await it.next();
+    await expect(it.next()).resolves.toEqual({done: false, value: 1});
     await delay(100);
-    await it.return!();
+    await expect(it.return!()).resolves.toEqual({done: true, value: 1});
     await delay(100);
   });
 
@@ -214,9 +214,9 @@ describe('_execute', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(10);
-    await it.next();
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
     await delay(100);
-    await it.return!();
+    await expect(it.return!()).resolves.toEqual({done: true, value: 1});
     await delay(100);
     expect(lastStatementReached).toBe(true);
   });
@@ -229,13 +229,102 @@ describe('_execute', () => {
     };
     const it = _execute(tenNumbers, f, concurrency, true);
     await delay(10);
-    await it.next();
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
     await delay(100);
-    await it.return!();
+    await expect(it.return!()).resolves.toEqual({done: true, value: 1});
     await delay(100);
   });
 
-  it('supports eager throwing consumer', async () => {
+  it('supports throwing producer', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    async function* numberGenerator(): AsyncIterable<number> {
+      await delay(50);
+      yield 42;
+      await delay(50);
+      yield 84;
+      await delay(50);
+      throw error;
+    }
+    const f = async (n: number) => {
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 42});
+    await expect(it.next()).resolves.toEqual({done: false, value: 84});
+    await expect(it.next()).rejects.toThrow(error);
+  });
+
+  it('supports throwing producer (delayed consumer)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    async function* numberGenerator(): AsyncIterable<number> {
+      yield 42;
+      yield 84;
+      throw error;
+    }
+    const f = async (n: number) => {
+      await delay(n);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    const promise1 = it.next();
+    const promise2 = it.next();
+    const promise3 = it.next();
+    await expect(promise1).rejects.toThrow(error); // first promise fails as the failure is the first value to return since it doesn't go through the 'f' function
+    await expect(promise2).resolves.toEqual({done: false, value: 42});
+    await expect(promise3).resolves.toEqual({done: false, value: 84});
+  });
+
+  it('supports throwing producer (delayed consumer, no backpressure)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    async function* numberGenerator(): AsyncIterable<number> {
+      await delay(10);
+      yield 42;
+      await delay(10);
+      yield 84;
+      await delay(10);
+      throw error;
+    }
+    const f = async (n: number) => {
+      if (n === 84) {
+        await delay(100);
+      }
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    const promise1 = it.next();
+    const promise2 = it.next();
+    const promise3 = it.next();
+    await expect(promise1).resolves.toEqual({done: false, value: 42});
+    await expect(promise2).rejects.toThrow(error);
+    await expect(promise3).resolves.toEqual({done: false, value: 84});
+  });
+
+  it('supports eager throwing producer (delayed consumer, no backpressure)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    async function* numberGenerator(): AsyncIterable<number> {
+      yield 42;
+      throw error;
+    }
+    const f = async (n: number) => {
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, false);
+    await delay(1);
+    const promise1 = it.next();
+    await delay(50);
+    const promise2 = it.next();
+    await expect(promise1).resolves.toEqual({done: false, value: 42});
+    await expect(promise2).rejects.toThrow(error);
+  });
+
+  it('supports eager throwing consumer (unhandled)', async () => {
     const concurrency = 5;
     const error = new Error('boom');
     async function* numberGenerator(): AsyncIterable<number> {
@@ -248,10 +337,118 @@ describe('_execute', () => {
       await delay(50);
       return n;
     };
-    const it = _execute(numberGenerator(), f, concurrency, false);
+    const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(1);
-    const eagerReturnConsumer = await it.throw!(error);
-    expect(eagerReturnConsumer).toEqual({done: false, value: 0});
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.throw!(error)).rejects.toThrow(error);
+  });
+
+  it('supports eager throwing consumer (handled)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    let errorCaught = false;
+    async function* numberGenerator(): AsyncIterable<number> {
+      try {
+        for (const value of tenNumbers) {
+          await delay(50);
+          yield value;
+        }
+      } catch (err) {
+        errorCaught = true;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await it.throw!(error);
+    expect(errorCaught).toBe(true);
+  });
+
+  it('supports eager throwing consumer with regular generator (unhandled)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    function* numberGenerator(): Iterable<number> {
+      for (const value of tenNumbers) {
+        yield value;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.throw!(error)).rejects.toThrow(error);
+  });
+
+  it('supports eager throwing consumer with regular generator (handled)', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    let errorCaught = false;
+    function* numberGenerator(): Iterable<number> {
+      try {
+        for (const value of tenNumbers) {
+          yield value;
+        }
+      } catch (err) {
+        errorCaught = true;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.throw!(error)).resolves.toEqual({done: false, value: 1});
+    expect(errorCaught).toBe(true);
+  });
+
+  it('supports eager throwing consumer with regular iterator', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    const it = _execute(tenNumbers, f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    await expect(it.throw!(error)).resolves.toEqual({done: false, value: 1});
+  });
+
+  it('supports eager throwing consumer with asynchronous iterator', async () => {
+    const concurrency = 5;
+    const error = new Error('boom');
+    const f = async (n: number) => {
+      await delay(50);
+      return n;
+    };
+    function numberGenerator(): AsyncIterable<number> {
+      const ait: AsyncIterator<number> = {
+        async next(): Promise<IteratorResult<number>> {
+          return {
+            done: false,
+            value: 1
+          };
+        }
+      };
+      return {
+        [Symbol.asyncIterator]: () => {
+          return ait;
+        }
+      };
+    }
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(1);
+    await expect(it.next()).resolves.toEqual({done: false, value: 1});
+    await expect(it.throw!(error)).resolves.toEqual({done: false, value: 1});
   });
 
 });
