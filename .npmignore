@@ -6,3 +6,4 @@ bitbucket-pipelines.yml
 test/
 out/test/
 .jest
+.idea

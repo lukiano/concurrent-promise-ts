@@ -1,6 +1,6 @@
 {
   "name": "concurrent-promise-ts",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "description": "An efficient promise executor",
   "author": "Luciano Leggieri",
   "license": "BSD-3-Clause",
