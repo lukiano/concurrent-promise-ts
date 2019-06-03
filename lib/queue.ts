@@ -41,9 +41,18 @@ export class Queue<T, U> implements AsyncIterator<U> {
   }
 
   // finish iterator and ignore remaining results
-  async return(value?: U): Promise<IteratorResult<U>> {
+  async return(value?: any): Promise<IteratorResult<U>> {
     this._producerFinished = true;
-    const result = await this._doNext(value, true);
+    const result = await this._doNext(value);
+    if (this._ait) {
+      if (this._ait.return) {
+        await this._ait.return(value);
+      }
+    } else {
+      if (this._it!.return) {
+        this._it!.return(value);
+      }
+    }
     return buildResult(true, value !== undefined ? value : result.value);
   }
 
@@ -53,11 +62,11 @@ export class Queue<T, U> implements AsyncIterator<U> {
     return this.next();
   }
 
-  private _doNext(value?: any, returnCalled = false): Promise<IteratorResult<U>> {
+  private _doNext(value?: any): Promise<IteratorResult<U>> {
     if (this._resultsReadyToConsume.length > 0) {
       const result = this._resultsReadyToConsume.shift()!;
       this._nextValues.push(value);
-      this._tryToFireMoreWork(returnCalled);
+      this._tryToFireMoreWork();
       if (result instanceof Success) {
         return Promise.resolve(buildResult(false, result.value));
       } else {
@@ -70,26 +79,26 @@ export class Queue<T, U> implements AsyncIterator<U> {
     return new Promise<IteratorResult<U>>((resolve, reject) => {
       this._waitingConsumers.push({resolve, reject});
       this._nextValues.push(value);
-      this._tryToFireMoreWork(returnCalled);
+      this._tryToFireMoreWork();
     });
   }
 
-  private _tryToFireMoreWork(returnCalled = false): void {
+  private _tryToFireMoreWork(): void {
     const resultsWaitingToBeConsumed = this._backPressure
       ? this._resultsReadyToConsume.length + this._producersInProgress
       : this._producersInProgress;
     if (resultsWaitingToBeConsumed < this._concurrency && !this._producerFinished) {
-      this._startWork(this._nextValues.shift(), returnCalled);
+      this._startWork(this._nextValues.shift());
       // setImmediate(() => this._tryToFireMoreWork());
     }
   }
 
-  private async _startWork(value: any, returnCalled: boolean): Promise<void> {
+  private async _startWork(value: any): Promise<void> {
     this._producersInProgress++;
     try {
       const result = this._ait
-          ? await (returnCalled && this._ait.return ? this._ait.return(value) : this._ait.next(value))
-          : (returnCalled && this._it!.return ? this._it!.return(value) : this._it!.next(value));
+        ? await this._ait.next(value)
+        : this._it!.next(value);
       if (defined(result.value)) {
         const newValue = await this._f(result.value);
         this._producersInProgress--;

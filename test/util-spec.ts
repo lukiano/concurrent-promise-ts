@@ -142,13 +142,12 @@ describe('_execute', () => {
   });
 
   it('supports eager return consumer with backpressure', async () => {
-    const concurrency = 10;
+    const concurrency = 2;
     let lastStatementReached = false;
     async function* numberGenerator(): AsyncIterable<number> {
       try {
         for (const value of tenNumbers) {
           await delay(10);
-          console.log(value);
           yield value;
         }
       } finally {
@@ -164,8 +163,76 @@ describe('_execute', () => {
     await it.next();
     await delay(100);
     await it.return!();
-    await delay(1000);
-    expect(lastStatementReached).toBe(false);
+    await delay(100);
+    expect(lastStatementReached).toBe(true);
+  });
+
+  it('supports eager return consumer with asynchronous iterator', async () => {
+    const concurrency = 2;
+    function numberGenerator(): AsyncIterable<number> {
+      const ait: AsyncIterator<number> = {
+        async next(): Promise<IteratorResult<number>> {
+          return {
+            done: false,
+            value: 1
+          };
+        }
+      };
+      return {
+        [Symbol.asyncIterator]: () => {
+          return ait;
+        }
+      };
+    }
+    const f = async (n: number) => {
+      await delay(1000);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(10);
+    await it.next();
+    await delay(100);
+    await it.return!();
+    await delay(100);
+  });
+
+  it('supports eager return consumer with regular generator', async () => {
+    const concurrency = 2;
+    let lastStatementReached = false;
+    function* numberGenerator(): Iterable<number> {
+      try {
+        for (const value of tenNumbers) {
+          yield value;
+        }
+      } finally {
+        lastStatementReached = true;
+      }
+    }
+    const f = async (n: number) => {
+      await delay(1000);
+      return n;
+    };
+    const it = _execute(numberGenerator(), f, concurrency, true);
+    await delay(10);
+    await it.next();
+    await delay(100);
+    await it.return!();
+    await delay(100);
+    expect(lastStatementReached).toBe(true);
+  });
+
+  it('supports eager return consumer with regular iterator', async () => {
+    const concurrency = 2;
+    const f = async (n: number) => {
+      await delay(1000);
+      return n;
+    };
+    const it = _execute(tenNumbers, f, concurrency, true);
+    await delay(10);
+    await it.next();
+    await delay(100);
+    await it.return!();
+    await delay(100);
   });
 
   it('supports eager throwing consumer', async () => {
