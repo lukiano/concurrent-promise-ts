@@ -8,11 +8,10 @@ import {accumulate, _execute, makeIterator} from './util';
  * @param {boolean} backPressure
  * @returns {Promise<Array<U>>}
  */
-export async function all<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => Promise<U>, concurrency = 32, backPressure = false): Promise<Array<U>> {
+export function all<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => Promise<U>, concurrency = 32, backPressure = false): Promise<Array<U>> {
   const results = new Array<U>();
   const ait = _execute(it, f, concurrency, backPressure);
-  await accumulate(ait, results);
-  return results;
+  return accumulate(ait, results);
 }
 
 /**

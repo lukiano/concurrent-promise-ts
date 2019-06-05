@@ -33,21 +33,23 @@ export function isIterable<T>(it: any): it is Iterable<T> {
   return it && typeof it[Symbol.iterator] === 'function';
 }
 
-export async function accumulate<U>(ait: AsyncIterator<U>, results: Array<U>): Promise<void> {
-  const result = await ait.next();
-  if (result.value) {
-    results.push(result.value);
-  }
-  if (!result.done) {
+export function accumulate<U>(ait: AsyncIterator<U>, results: Array<U>): Promise<Array<U>> {
+  return ait.next().then((result) => {
+    if (result.value) {
+      results.push(result.value);
+    }
+    if (result.done) {
+      return results;
+    }
     return accumulate(ait, results);
-  }
+  });
 }
 
 export function errorIterator(err: Error): AsyncIterator<never> {
   return {
     next: () => Promise.reject(err),
     return: () => Promise.reject(err),
-    throw: (e?: Error) => e ? Promise.reject(e) : Promise.reject(err)
+    throw: (e?: Error) => Promise.reject(e || err)
   };
 }
 
