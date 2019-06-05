@@ -58,23 +58,21 @@ export class Queue<T, U> implements AsyncIterator<U> {
   // finish iterator and ignore remaining results
   return(value?: any): Promise<IteratorResult<U>> {
     this._producerFinished = true;
-    return this._doNext(value)
-      .then((result) => this._doReturn(result, value))
-      .then((result) => buildResult(true, value !== undefined ? value : result.value));
+    return this._doReturn(value);
   }
 
   throw(value?: any): Promise<IteratorResult<U>> {
     return this._doThrow(value).then(() => this.next());
   }
 
-  private _doReturn(result: IteratorResult<U>, value?: any): Promise<IteratorResult<U>> {
+  private _doReturn(value?: any): Promise<IteratorResult<U>> {
     if (this._ait && this._ait.return) {
-      return this._ait.return(value).then(() => result);
+      return this._ait.return(value).then(() => buildResult(true, value));
     }
     if (this._it && this._it.return) {
       this._it.return(value);
     }
-    return Promise.resolve(result);
+    return Promise.resolve(buildResult(true, value));
   }
 
   private _doThrow(value?: any): Promise<any> {
