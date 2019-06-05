@@ -1,26 +1,44 @@
-import {buildResult, defined} from './util';
-
-type Consumer<T> = {
+/**
+ * Future resolution of a promise returned by calling `next()`
+ * when no values where ready to return at the moment the method was called.
+ */
+type DeferredPromise<T> = {
   resolve: (t: IteratorResult<T>) => void;
   reject: (err: unknown) => void;
 };
 
+/**
+ * A successful value given by a job.
+ */
 class Success<T> {
   constructor(public readonly value: T) {}
 }
 
+/**
+ * A job failure.
+ */
 class Failure {
   constructor(public readonly err: unknown) {}
 }
 
-type Try<T> = Success<T> | Failure;
+/**
+ * @return true if t is not null nor undefined.
+ * @param t a possibly undefined value.
+ */
+function defined<T>(t: T | null | undefined): t is T {
+  return t !== undefined && t !== null;
+}
+
+function buildResult<T>(done: boolean, value?: T): IteratorResult<T> {
+  return {done, value: value as any as T};
+}
 
 export class Queue<T, U> implements AsyncIterator<U> {
 
-  private _producersInProgress = 0;
-  private readonly _resultsReadyToConsume = new Array<Try<U>>();
-  private readonly _waitingConsumers = new Array<Consumer<U>>();
-  private readonly _nextValues = Array<any>();
+  private _jobsInProgress = 0;
+  private readonly _resultsReadyToBeConsumed: Array<Success<U> | Failure> = [];
+  private readonly _waitingConsumers: Array<DeferredPromise<U>> = [];
+  private readonly _valuesPassedByArgument = Array<any>();
   private _producerFinished = false;
 
   constructor(private readonly _ait: AsyncIterator<T> | undefined,
@@ -28,9 +46,6 @@ export class Queue<T, U> implements AsyncIterator<U> {
     private readonly _f: (t: T) => Promise<U>,
     private readonly _concurrency: number,
     private readonly _backPressure: boolean) {
-    if (!this._ait && !this._it) {
-      throw new Error('Iterator not set');
-    }
     if (!this._backPressure) {
       this._tryToFireMoreWork();
     }
@@ -77,68 +92,61 @@ export class Queue<T, U> implements AsyncIterator<U> {
   }
 
   private _doNext(value?: any): Promise<IteratorResult<U>> {
-    if (this._resultsReadyToConsume.length > 0) {
-      return this._returnResultReadyToConsume(value);
+    if (this._resultsReadyToBeConsumed.length > 0) {
+      const result = this._resultsReadyToBeConsumed.shift()!;
+      this._valuesPassedByArgument.push(value);
+      this._tryToFireMoreWork();
+      if (result instanceof Success) {
+        return Promise.resolve(buildResult(false, result.value));
+      }
+      return Promise.reject(result.err);
     }
-    if (this._producerFinished && this._producersInProgress === 0) {
+    if (this._producerFinished && this._jobsInProgress === 0) {
       return Promise.resolve(buildResult(true));
     }
+    this._valuesPassedByArgument.push(value);
     return new Promise<IteratorResult<U>>((resolve, reject) => {
       this._waitingConsumers.push({resolve, reject});
-      this._nextValues.push(value);
       this._tryToFireMoreWork();
     });
   }
 
-  private _returnResultReadyToConsume(value?: any): Promise<IteratorResult<U>> {
-    const result = this._resultsReadyToConsume.shift()!;
-    this._nextValues.push(value);
-    this._tryToFireMoreWork();
-    if (result instanceof Success) {
-      return Promise.resolve(buildResult(false, result.value));
-    }
-    return Promise.reject(result.err);
-  }
-
   private _tryToFireMoreWork(): void {
     const resultsWaitingToBeConsumed = this._backPressure
-      ? this._resultsReadyToConsume.length + this._producersInProgress
-      : this._producersInProgress;
+      ? this._resultsReadyToBeConsumed.length + this._jobsInProgress
+      : this._jobsInProgress;
     if (resultsWaitingToBeConsumed < this._concurrency && !this._producerFinished) {
-      this._startWork(this._nextValues.shift());
-      // setImmediate(() => this._tryToFireMoreWork());
+      this._startOneJob(this._valuesPassedByArgument.shift());
     }
   }
 
-  private _startWork(value: any): Promise<void> {
-    this._producersInProgress++;
+  private _startOneJob(value: any): void {
+    this._jobsInProgress++;
     const next = this._ait ? this._ait.next(value) : Promise.resolve(this._it!.next(value));
-    return next
+    next
       .then((result) => this._processResult(result), (err) => {
-        this._producersInProgress--;
+        this._jobsInProgress--;
         this._producerError(err);
-      })
-      .then(() => {
-        this._tryToFireMoreWork();
       });
   }
 
-  private _processResult(result: IteratorResult<T>): Promise<void> {
+  private _processResult(result: IteratorResult<T>): void {
     if (defined(result.value)) {
-      return this._processDefinedResult(result);
+      this._processDefinedResult(result);
     } else {
-      this._producersInProgress--;
+      this._jobsInProgress--;
       this._addResult(buildResult<U>(result.done, undefined));
-      return Promise.resolve();
+      this._tryToFireMoreWork();
     }
   }
 
-  private _processDefinedResult(result: IteratorResult<T>): Promise<void> {
-    return this._f(result.value).then((newValue) => {
-      this._producersInProgress--;
+  private _processDefinedResult(result: IteratorResult<T>): void {
+    this._f(result.value).then((newValue) => {
+      this._jobsInProgress--;
       this._addResult(buildResult(result.done, newValue));
+      this._tryToFireMoreWork();
     }, (err) => {
-      this._producersInProgress--;
+      this._jobsInProgress--;
       this._producerError(err);
     });
   }
@@ -148,7 +156,7 @@ export class Queue<T, U> implements AsyncIterator<U> {
       this._giveResultToConsumer(result);
     } else {
       if (defined(result.value)) {
-        this._resultsReadyToConsume.push(new Success(result.value));
+        this._resultsReadyToBeConsumed.push(new Success(result.value));
       }
       if (result.done) {
         this._producerHasFinished();
@@ -159,7 +167,7 @@ export class Queue<T, U> implements AsyncIterator<U> {
   private _giveResultToConsumer(result: IteratorResult<U>): void {
     if (result.done) {
       this._producerHasFinished();
-      if (this._producersInProgress > 0) {
+      if (this._jobsInProgress > 0) {
         if (defined(result.value)) {
           result.done = false;
         } else {
@@ -172,7 +180,7 @@ export class Queue<T, U> implements AsyncIterator<U> {
     }
     const waitingConsumer = this._waitingConsumers.shift()!;
     waitingConsumer.resolve(result);
-    if (this._producerFinished && this._waitingConsumers.length > 0 && this._producersInProgress === 0) {
+    if (this._producerFinished && this._waitingConsumers.length > 0 && this._jobsInProgress === 0) {
       this._producerHasFinished();
     }
   }
@@ -182,14 +190,14 @@ export class Queue<T, U> implements AsyncIterator<U> {
       const waitingConsumer = this._waitingConsumers.shift()!;
       waitingConsumer.reject(err);
     } else {
-      this._resultsReadyToConsume.push(new Failure(err));
+      this._resultsReadyToBeConsumed.push(new Failure(err));
     }
     this._producerHasFinished();
   }
 
   private _producerHasFinished(): void {
     this._producerFinished = true;
-    if (this._producersInProgress === 0) {
+    if (this._jobsInProgress === 0) {
       this._resolveWaitingConsumers();
     }
   }
