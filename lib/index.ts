@@ -1,4 +1,4 @@
-import {Queue} from './queue';
+import {Processor} from './internals';
 
 /**
  * Returns a new asynchronous iterator that has `it` as source and applies the function `f` to each value of `it`, as being requested.
@@ -21,9 +21,9 @@ function executeOnce<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => Prom
 
   if (it) {
     if (isIterable(it)) {
-      return new Queue(undefined, it[Symbol.iterator](), f, concurrency, backPressure);
+      return new Processor(undefined, it, f, concurrency, backPressure).run();
     } else if (isAsyncIterable(it)) {
-      return new Queue(it[Symbol.asyncIterator](), undefined, f, concurrency, backPressure);
+      return new Processor(it, undefined, f, concurrency, backPressure).run();
     }
   }
 
@@ -90,7 +90,7 @@ export function errorIterator(err: Error): AsyncIterator<never> {
  * @param {number} concurrency the maximum number of jobs running at a time.
  * A job is the concatenation of requesting a value to the source iterator plus calling the function `f` with that value.
  * @returns {Promise<Array<U>>} An array with the values resulting from applying the function `f` to each value of the iterator.
- * The values in the array may not be in the same order as the iterator returned them.
+ * The values in the array will be in the same order as the iterator returned them.
  */
 export function all<T, U>(it: Iterable<T> | AsyncIterable<T>, f: (t: T) => Promise<U>, concurrency = 32): Promise<Array<U>> {
   const results: Array<U> = [];

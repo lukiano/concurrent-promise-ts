@@ -533,7 +533,7 @@ describe('executeOnce', () => {
     await expect(it.next()).rejects.toThrow(error);
   });
 
-  it.skip('supports throwing producer (delayed consumer)', async () => {
+  it('supports throwing producer (delayed consumer)', async () => {
     const concurrency = 5;
     const error = new Error('boom 10');
     async function* numberGenerator(): AsyncIterable<number> {
@@ -550,12 +550,12 @@ describe('executeOnce', () => {
     const promise1 = it.next();
     const promise2 = it.next();
     const promise3 = it.next();
-    await expect(promise1).rejects.toThrow(error); // first promise fails as the failure is the first value to return since it doesn't go through the 'f' function
-    await expect(promise2).resolves.toEqual({done: false, value: 42});
-    await expect(promise3).resolves.toEqual({done: false, value: 84});
+    await expect(promise1).resolves.toEqual({done: false, value: 42});
+    await expect(promise2).resolves.toEqual({done: false, value: 84});
+    await expect(promise3).rejects.toThrow(error);
   });
 
-  it.skip('supports throwing producer (delayed consumer, no backpressure)', async () => {
+  it('supports throwing producer (delayed consumer, no backpressure)', async () => {
     const concurrency = 5;
     const error = new Error('boom 11');
     async function* numberGenerator(): AsyncIterable<number> {
@@ -578,8 +578,8 @@ describe('executeOnce', () => {
     const promise2 = it.next();
     const promise3 = it.next();
     await expect(promise1).resolves.toEqual({done: false, value: 42});
-    await expect(promise2).rejects.toThrow(error);
-    await expect(promise3).resolves.toEqual({done: false, value: 84});
+    await expect(promise2).resolves.toEqual({done: false, value: 84});
+    await expect(promise3).rejects.toThrow(error);
   });
 
   it('supports eager throwing producer (delayed consumer, no backpressure)', async () => {
