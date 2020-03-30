@@ -15,6 +15,11 @@ describe('all', () => {
     expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
+  it('with iterables', async () => {
+    const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve([n, n])), 3);
+    expect(actualValues).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
+  });
+
   it('with 50ms delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3);
     expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);

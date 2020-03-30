@@ -1,6 +1,6 @@
 {
   "name": "concurrent-promise-ts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An efficient promise executor",
   "author": "Luciano Leggieri",
   "license": "BSD-3-Clause",
@@ -29,16 +29,17 @@
     "coveralls": "cat ./coverage/lcov.info | node node_modules/.bin/coveralls"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.13",
-    "coveralls": "^3.0.3",
-    "jest": "^24.8.0",
-    "ts-jest": "^24.0.2",
-    "ts-node": "^7.0.1",
-    "tslint": "^5.17.0",
-    "tslint-consistent-codestyle": "^1.15.1",
+    "@types/jest": "^25.1.4",
+    "@types/node": "^13.9.5",
+    "coveralls": "^3.0.11",
+    "jest": "^25.2.0",
+    "ts-jest": "^25.2.1",
+    "ts-node": "^8.8.1",
+    "tslint": "^6.1.0",
+    "tslint-consistent-codestyle": "^1.16.0",
     "tslint-eslint-rules": "^5.4.0",
     "tslint-microsoft-contrib": "^6.2.0",
-    "typescript": "^3.5.1",
+    "typescript": "^3.8.3",
     "typescript-formatter": "^7.2.2"
   },
   "main": "out/lib/index.js",

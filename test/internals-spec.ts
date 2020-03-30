@@ -38,7 +38,7 @@ describe('Processor', () => {
     while (!failed && !finished) {
       try {
         const value = await it.next();
-        finished = value.done;
+        finished = value.done || false;
         if (value.value !== undefined) {
           actualValues.push(value.value);
         }

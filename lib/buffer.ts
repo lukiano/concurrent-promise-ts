@@ -1,21 +1,27 @@
-import {done} from './util';
+import {done, isIterable} from './util';
 
-async function* futures<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U>): AsyncIterable<Future<U>> {
+async function* futures<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U | Iterable<U>>): AsyncIterable<Future<U>> {
   for await (const item of source) {
-    yield new Future(f(item));
+    const processing = f(item);
+    yield new Future(processing);
   }
 }
 
-export async function* buffer<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U>, concurrency: number, backPressure: boolean): AsyncIterable<U> {
+export async function* buffer<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U | Iterable<U>>, concurrency: number, backPressure: boolean): AsyncIterable<U> {
   const sourceIterator = futures(source, f)[Symbol.asyncIterator]();
   const bufferedIterator = new Buffer(sourceIterator, concurrency, backPressure);
   try {
     while (true) {
-      const result = await bufferedIterator.next();
+      const result: IteratorResult<U | Iterable<U>> = await bufferedIterator.next();
       if (result.done) {
-        return result.value;
+        return;
       }
-      yield result.value;
+      const value: U | Iterable<U> = result.value;
+      if (isIterable(value)) {
+        yield* value;
+      } else {
+        yield value;
+      }
     }
   } finally {
     await sourceIterator.return!();
@@ -27,7 +33,7 @@ export async function* buffer<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (
  */
 
 class Success<T> {
-  constructor(public readonly result: IteratorResult<T>) {}
+  constructor(public readonly result: IteratorResult<T | Iterable<T>>) {}
 }
 
 /**
@@ -41,14 +47,10 @@ class Failure {
  * Promise wrapper that enables concurrency.
  */
 class Future<T> {
-  constructor(public readonly promise: Promise<T>) {}
+  constructor(public readonly promise: Promise<T | Iterable<T>>) {}
 
-  async result(): Promise<IteratorResult<T>> {
-    const value = await this.promise;
-    return {
-      done: false,
-      value
-    };
+  result(): Promise<T | Iterable<T>> {
+    return this.promise;
   }
 }
 
@@ -71,10 +73,10 @@ class Buffer<T> {
   }
 
   /**
-   * Get the next result from the buffer.
+   * Get the next result from the buffer. Must be called after Promise of previous next() completes.
    * @private
    */
-  async next(): Promise<IteratorResult<T>> {
+  async next(): Promise<IteratorResult<T | Iterable<T>>> {
     const value = this._buffer.shift()!;
     this._fill();
     if (value instanceof Promise) {
@@ -82,7 +84,11 @@ class Buffer<T> {
       if (result.done) {
         return done();
       }
-      return result.value.result();
+      const innerResult = await result.value.result();
+      return {
+        done: false,
+        value: innerResult
+      };
     }
     // If not a promise, then it is a stored result.
     this._valuesStored--;
@@ -114,9 +120,12 @@ class Buffer<T> {
     let resolvedValue: Success<T> | Failure;
     try {
       const result = await promise;
-      let futureResult: IteratorResult<T>;
-      if (result.value) {
-        futureResult = await result.value.result();
+      let futureResult: IteratorResult<T | Iterable<T>>;
+      if (result.value !== undefined) {
+        futureResult = {
+          done: false,
+          value: await result.value.result()
+        };
       } else {
         this._finished = true;
         futureResult = done();
