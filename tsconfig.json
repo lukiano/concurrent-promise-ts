@@ -2,7 +2,8 @@
   "compilerOptions": {
     "allowJs": false,
     "declaration": true,
-    "module": "commonjs",
+    "esModuleInterop": true,
+    "module": "es6",
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitAny": true,

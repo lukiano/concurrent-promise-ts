@@ -29,20 +29,25 @@ export function isIterable<T>(it: unknown): it is Iterable<T> {
 /**
  * Read all the values produced by the asynchronous iterator into an array and return it.
  * @template {U} type of the values returned by the source iterator.
- * @param {AsyncIterator<U>} ait iterator to read the values from.
+ * @param {AsyncIterator<U>} source iterator to read the values from.
  * @returns {Promise<Array<U>>} a promise fulfilled with the an array after all the values of the iterator have been added to it, or rejected by any error produced by the source iterator.
  */
-export async function accumulate<U>(ait: AsyncIterable<U>): Promise<Array<U>> {
+export async function accumulate<U>(source: AsyncIterable<U>): Promise<Array<U>> {
   const results: Array<U> = [];
-  for await (const value of ait) {
+  for await (const value of source) {
     results.push(value);
   }
   return results;
 }
 
-export function done<T>(): IteratorResult<T> {
-  return {
-    done: true,
-    value: undefined,
-  };
+export async function* shield<T>(source: Promise<T | Iterable<T>> | T): AsyncIterable<T> {
+  const value = await source;
+  if (isIterable(value)) {
+    yield* value;
+  } else {
+    yield value;
+  }
+}
+
+export async function* empty<T>(): AsyncIterable<T> {
 }

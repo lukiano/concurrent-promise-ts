@@ -37,5 +37,8 @@
     "typescript-eslint": "^8.58.2"
   },
   "main": "out/lib/index.js",
-  "typings": "./out/lib/index.d.ts"
+  "typings": "./out/lib/index.d.ts",
+  "dependencies": {
+    "p-queue": "^7.2.0"
+  }
 }

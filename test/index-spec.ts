@@ -9,9 +9,32 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function wait<T>(ms: number, t: T): Promise<T> {
+  return delay(ms).then(() => t);
+}
+
 const tenNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 describe('all', () => {
+
+  it('handles undefined arguments', async () => {
+    throws(() => all(undefined as unknown as Array<number>, () => delay(100)), /Unrecognized source of data/);
+  });
+
+  it('handles plain values', async () => {
+    const actualValues = await all([42], ((n) => wait(100, n + 1)), 3);
+    deepEqual(actualValues, [43]);
+  });
+
+  it('handles plain promises', async () => {
+    const actualValues = await all(wait(100, 42), ((n) => wait(100, n + 1)), 3);
+    deepEqual(actualValues, [43]);
+  });
+
+  it('handles promises that return arrays', async () => {
+    const actualValues = await all(wait(100, [42, 44]), ((n) => wait(100, n + 1)), 3);
+    deepEqual(actualValues, [43, 45]);
+  });
 
   it('with no delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve(n)), 3);
@@ -24,12 +47,21 @@ describe('all', () => {
   });
 
   it('with 50ms delay', async () => {
-    const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3);
+    const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => wait(50, n)), 3);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
+  });
+
+  it('with delayed async iterables', async () => {
+    async function* f(n: number): AsyncIterable<number> {
+      await delay(n * 10);
+      yield n;
+    }
+    const actualValues = await all([1, 2, 3, 4, 5, 6], f);
     deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('with default concurrency', async () => {
-    const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)));
+    const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => wait(50, n)));
     deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
@@ -70,7 +102,7 @@ describe('all', () => {
   });
 
   it('with empty sources', async () => {
-    const actualValues = await all([], ((n) => delay(50).then(() => n)));
+    const actualValues = await all([], ((n) => wait(50, n)));
     deepEqual(actualValues, []);
   });
 
@@ -88,7 +120,7 @@ describe('execute', () => {
 
   it('with 50ms delay', async () => {
     const actualValues = new Array<number>();
-    for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3, false)) {
+    for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => wait(50, n)), 3, false)) {
       actualValues.push(value);
     }
     deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
@@ -96,7 +128,7 @@ describe('execute', () => {
 
   it('with default concurrency', async () => {
     const actualValues = new Array<number>();
-    for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)))) {
+    for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => wait(50, n)))) {
       actualValues.push(value);
     }
     deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
@@ -208,14 +240,6 @@ describe('execute', () => {
       }
     }
     deepEqual(actualValues.sort((a, b) => a - b), [0, 1, 2, 3, 4]);
-  });
-
-  it('handles undefined arguments', async () => {
-    throws(() => execute(undefined as unknown as Array<number>, ((n) => delay(100).then(() => n)), 3, false), /Unrecognized source of data/);
-  });
-
-  it('handles invalid arguments', async () => {
-    throws(() => execute(42 as unknown as Array<number>, ((n) => delay(100).then(() => n)), 3, false), /Unrecognized source of data/);
   });
 
   it('supports 1-value iterator', async () => {
