@@ -1,3 +1,6 @@
+import {deepEqual, equal, fail, rejects, throws} from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {all, execute} from '../lib';
 
 function delay(ms: number): Promise<void> {
@@ -12,22 +15,22 @@ describe('all', () => {
 
   it('with no delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve(n)), 3);
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('with iterables', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve([n, n])), 3);
-    expect(actualValues).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
+    deepEqual(actualValues, [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
   });
 
   it('with 50ms delay', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3);
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('with default concurrency', async () => {
     const actualValues = await all([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)));
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('does not swallow errors', async () => {
@@ -40,7 +43,7 @@ describe('all', () => {
       return n;
     };
     const promise = all([1, 2, 3, 4, 5, 6], f, 3);
-    await expect(promise).rejects.toBe(error);
+    await rejects(promise, error);
   });
 
   it('does not swallow errors at full concurrency', async () => {
@@ -53,22 +56,22 @@ describe('all', () => {
       return n;
     };
     const promise = all([1, 2, 3, 4, 5, 6], f);
-    await expect(promise).rejects.toBe(error);
+    await rejects(promise, error);
   });
 
   it('fails with negative concurrency argument', async () => {
     const promise = all([1, 2, 3, 4, 5, 6], (n) => Promise.resolve(n), -1);
-    await expect(promise).rejects.toThrow('Invalid concurrency value');
+    await rejects(promise, /Invalid concurrency value/);
   });
 
   it('fails with invalid concurrency argument', async () => {
     const promise = all([1, 2, 3, 4, 5, 6], (n) => Promise.resolve(n), NaN);
-    await expect(promise).rejects.toThrow('Invalid concurrency value');
+    await rejects(promise, /Invalid concurrency value/);
   });
 
   it('with empty sources', async () => {
     const actualValues = await all([], ((n) => delay(50).then(() => n)));
-    expect(actualValues).toEqual([]);
+    deepEqual(actualValues, []);
   });
 
 });
@@ -80,7 +83,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => Promise.resolve(n)), 3, false)) {
       actualValues.push(value);
     }
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('with 50ms delay', async () => {
@@ -88,7 +91,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)), 3, false)) {
       actualValues.push(value);
     }
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('with default concurrency', async () => {
@@ -96,7 +99,7 @@ describe('execute', () => {
     for await (const value of execute([1, 2, 3, 4, 5, 6], ((n) => delay(50).then(() => n)))) {
       actualValues.push(value);
     }
-    expect(actualValues).toEqual([1, 2, 3, 4, 5, 6]);
+    deepEqual(actualValues, [1, 2, 3, 4, 5, 6]);
   });
 
   it('respects concurrency maximum value', async () => {
@@ -117,8 +120,8 @@ describe('execute', () => {
     for await (const value of execute(values, f, concurrency, false)) {
       actualValues.push(value);
     }
-    expect(actualValues.sort((a, b) => a - b)).toEqual(values);
-    expect(exceededLimit).toBe(false);
+    deepEqual(actualValues.sort((a, b) => a - b), values);
+    equal(exceededLimit, false);
   });
 
   it('achieves optimum concurrency', async () => {
@@ -144,9 +147,9 @@ describe('execute', () => {
     for await (const value of execute(values, f, concurrency, false)) {
       actualValues.push(value);
     }
-    expect(actualValues.sort((a, b) => a - b)).toEqual(values);
-    expect(concurrencyReached).toBe(true);
-    expect(concurrencyReduced).toBe(false);
+    deepEqual(actualValues.sort((a, b) => a - b), values);
+    equal(concurrencyReached, true);
+    equal(concurrencyReduced, false);
   });
 
   it('exercises back pressure', async () => {
@@ -173,8 +176,8 @@ describe('execute', () => {
       actualValues.push(value);
     }
     await delay(1);
-    expect(actualValues.sort((a, b) => a - b)).toEqual(tenNumbers);
-    expect(tooMuchPressure).toBe(false);
+    deepEqual(actualValues.sort((a, b) => a - b), tenNumbers);
+    equal(tooMuchPressure, false);
   });
 
   it('back pressure does not swallow errors', async () => {
@@ -204,15 +207,15 @@ describe('execute', () => {
         throw err;
       }
     }
-    expect(actualValues.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+    deepEqual(actualValues.sort((a, b) => a - b), [0, 1, 2, 3, 4]);
   });
 
   it('handles undefined arguments', async () => {
-    expect(() => execute(undefined as any as Array<number>, ((n) => delay(100).then(() => n)), 3, false)).toThrow('Unrecognized source of data');
+    throws(() => execute(undefined as unknown as Array<number>, ((n) => delay(100).then(() => n)), 3, false), /Unrecognized source of data/);
   });
 
   it('handles invalid arguments', async () => {
-    expect(() => execute(42 as any as Array<number>, ((n) => delay(100).then(() => n)), 3, false)).toThrow('Unrecognized source of data');
+    throws(() => execute(42 as unknown as Array<number>, ((n) => delay(100).then(() => n)), 3, false), /Unrecognized source of data/);
   });
 
   it('supports 1-value iterator', async () => {
@@ -232,7 +235,7 @@ describe('execute', () => {
     const it = execute(ait, f);
     await delay(1);
     for await (const value of it) {
-      expect(value).toEqual(42);
+      equal(value, 42);
     }
   });
 
@@ -268,8 +271,8 @@ describe('execute', () => {
       }
     }
     await delay(1);
-    expect(lastStatementReached).toBe(true);
-    expect(tooMuchPressure).toBe(false);
+    equal(lastStatementReached, true);
+    equal(tooMuchPressure, false);
   });
 
 });

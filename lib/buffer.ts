@@ -1,18 +1,31 @@
-import {done, isIterable} from './util';
+import { done, isIterable } from "./util";
 
-async function* futures<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U | Iterable<U>>): AsyncIterable<Future<U>> {
+async function* futures<T, U>(
+  source: AsyncIterable<T> | Iterable<T>,
+  f: (t: T) => Promise<U | Iterable<U>>,
+): AsyncIterable<Future<U>> {
   for await (const item of source) {
     const processing = f(item);
     yield new Future(processing);
   }
 }
 
-export async function* buffer<T, U>(source: AsyncIterable<T> | Iterable<T>, f: (t: T) => Promise<U | Iterable<U>>, concurrency: number, backPressure: boolean): AsyncIterable<U> {
+export async function* buffer<T, U>(
+  source: AsyncIterable<T> | Iterable<T>,
+  f: (t: T) => Promise<U | Iterable<U>>,
+  concurrency: number,
+  backPressure: boolean,
+): AsyncIterable<U> {
   const sourceIterator = futures(source, f)[Symbol.asyncIterator]();
-  const bufferedIterator = new Buffer(sourceIterator, concurrency, backPressure);
+  const bufferedIterator = new Buffer(
+    sourceIterator,
+    concurrency,
+    backPressure,
+  );
   try {
     while (true) {
-      const result: IteratorResult<U | Iterable<U>> = await bufferedIterator.next();
+      const result: IteratorResult<U | Iterable<U>> =
+        await bufferedIterator.next();
       if (result.done) {
         return;
       }
@@ -58,8 +71,9 @@ class Future<T> {
  * Storage of data requested to a source iterator.
  */
 class Buffer<T> {
-
-  private readonly _buffer: Array<Success<T> | Failure | Promise<IteratorResult<Future<T>>>> = [];
+  private readonly _buffer: Array<
+    Success<T> | Failure | Promise<IteratorResult<Future<T>>>
+  > = [];
 
   private _promisesInFlight = 0;
   private _valuesStored = 0;
@@ -68,7 +82,8 @@ class Buffer<T> {
   constructor(
     private readonly _sourceIterator: AsyncIterator<Future<T>>,
     private readonly _concurrency: number,
-    private readonly _backPressure: boolean) {
+    private readonly _backPressure: boolean,
+  ) {
     this._fill();
   }
 
@@ -87,7 +102,7 @@ class Buffer<T> {
       const innerResult = await result.value.result();
       return {
         done: false,
-        value: innerResult
+        value: innerResult,
       };
     }
     // If not a promise, then it is a stored result.
@@ -115,7 +130,9 @@ class Buffer<T> {
    * @param promise the promise to sanitise.
    * @private
    */
-  private async _sanitisePromise(promise: Promise<IteratorResult<Future<T>>>): Promise<void> {
+  private async _sanitisePromise(
+    promise: Promise<IteratorResult<Future<T>>>,
+  ): Promise<void> {
     this._promisesInFlight++;
     let resolvedValue: Success<T> | Failure;
     try {
@@ -124,7 +141,7 @@ class Buffer<T> {
       if (result.value !== undefined) {
         futureResult = {
           done: false,
-          value: await result.value.result()
+          value: await result.value.result(),
         };
       } else {
         this._finished = true;
@@ -143,7 +160,6 @@ class Buffer<T> {
 
     this._promisesInFlight--;
     this._fill(); // if backpressure is disabled we can request more data.
-
   }
 
   /**
@@ -151,7 +167,8 @@ class Buffer<T> {
    * @private
    */
   private _inFlight(): number {
-    return this._backPressure ? this._promisesInFlight + this._valuesStored : this._promisesInFlight;
+    return this._backPressure
+      ? this._promisesInFlight + this._valuesStored
+      : this._promisesInFlight;
   }
-
 }

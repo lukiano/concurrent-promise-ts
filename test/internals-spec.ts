@@ -1,3 +1,6 @@
+import {deepEqual, equal, fail, rejects} from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {buffer} from '../lib/buffer';
 
 function delay(ms: number): Promise<void> {
@@ -42,14 +45,14 @@ describe('Processor', () => {
         if (value.value !== undefined) {
           actualValues.push(value.value);
         }
-      } catch (err) {
+      } catch {
         failed = true;
       }
     }
     if (!failed) {
       fail('Expected asynchronous generator iteration to fail');
     }
-    expect(actualValues.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+    deepEqual(actualValues.sort((a, b) => a - b), [0, 1, 2, 3, 4]);
   });
 
   it('supports eager consumers', async () => {
@@ -77,7 +80,7 @@ describe('Processor', () => {
       }
     });
 
-    expect(actualValues.sort((a, b) => a - b)).toEqual(tenNumbers);
+    deepEqual(actualValues.sort((a, b) => a - b), tenNumbers);
   });
 
   it('supports eager return consumer with a value', async () => {
@@ -94,8 +97,8 @@ describe('Processor', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
-    await expect(it.next()).resolves.toEqual({done: false, value: 0});
-    await expect(it.return!(42)).resolves.toEqual({done: true, value: 42});
+    deepEqual(await it.next(), {done: false, value: 0});
+    deepEqual(await it.return!(42), {done: true, value: 42});
   });
 
   it('supports eager return consumer with no value', async () => {
@@ -112,8 +115,8 @@ describe('Processor', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, false);
     await delay(1);
-    await expect(it.next()).resolves.toEqual({done: false, value: 0});
-    await expect(it.return!()).resolves.toEqual({done: true, value: undefined});
+    deepEqual(await it.next(), {done: false, value: 0});
+    deepEqual(await it.return!(), {done: true, value: undefined});
   });
 
   it('supports eager return consumer with backpressure', async () => {
@@ -135,11 +138,11 @@ describe('Processor', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(10);
-    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    deepEqual(await it.next(), {done: false, value: 0});
     await delay(100);
-    await expect(it.return!()).resolves.toEqual({done: true, value: undefined});
+    deepEqual(await it.return!(), {done: true, value: undefined});
     await delay(100);
-    expect(lastStatementReached).toBe(true);
+    equal(lastStatementReached, true);
   });
 
   it('supports eager return consumer with regular generator', async () => {
@@ -160,11 +163,11 @@ describe('Processor', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(10);
-    await expect(it.next()).resolves.toEqual({done: false, value: 0});
+    deepEqual(await it.next(), {done: false, value: 0});
     await delay(100);
-    await expect(it.return!()).resolves.toEqual({done: true, value: undefined});
+    deepEqual(await it.return!(), {done: true, value: undefined});
     await delay(100);
-    expect(lastStatementReached).toBe(true);
+    equal(lastStatementReached, true);
   });
 
   it('supports throwing producer', async () => {
@@ -183,9 +186,9 @@ describe('Processor', () => {
     };
     const it = _execute(numberGenerator(), f, concurrency, true);
     await delay(1);
-    await expect(it.next()).resolves.toEqual({done: false, value: 42});
-    await expect(it.next()).resolves.toEqual({done: false, value: 84});
-    await expect(it.next()).rejects.toThrow(error);
+    deepEqual(await it.next(), {done: false, value: 42});
+    deepEqual(await it.next(), {done: false, value: 84});
+    await rejects(it.next(), error);
   });
 
   it('supports throwing producer (delayed consumer)', async () => {
@@ -205,9 +208,9 @@ describe('Processor', () => {
     const promise1 = it.next();
     const promise2 = it.next();
     const promise3 = it.next();
-    await expect(promise1).resolves.toEqual({done: false, value: 42});
-    await expect(promise2).resolves.toEqual({done: false, value: 84});
-    await expect(promise3).rejects.toThrow(error);
+    deepEqual(await promise1, {done: false, value: 42});
+    deepEqual(await promise2, {done: false, value: 84});
+    await rejects(promise3, error);
   });
 
   it('supports throwing producer (delayed consumer, no backpressure)', async () => {
@@ -232,9 +235,9 @@ describe('Processor', () => {
     const promise1 = it.next();
     const promise2 = it.next();
     const promise3 = it.next();
-    await expect(promise1).resolves.toEqual({done: false, value: 42});
-    await expect(promise2).resolves.toEqual({done: false, value: 84});
-    await expect(promise3).rejects.toThrow(error);
+    deepEqual(await promise1, {done: false, value: 42});
+    deepEqual(await promise2, {done: false, value: 84});
+    await rejects(promise3, error);
   });
 
   it('supports eager throwing producer (delayed consumer, no backpressure)', async () => {
@@ -252,8 +255,8 @@ describe('Processor', () => {
     const promise1 = it.next();
     await delay(50);
     const promise2 = it.next();
-    await expect(promise1).resolves.toEqual({done: false, value: 42});
-    await expect(promise2).rejects.toThrow(error);
+    deepEqual(await promise1, {done: false, value: 42});
+    await rejects(promise2, error);
   });
 
 });

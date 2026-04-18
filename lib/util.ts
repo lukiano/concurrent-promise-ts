@@ -3,8 +3,13 @@
  * @param {any} it the object to check if it conforms to the AsyncIterable spec.
  * @returns true if `it` has method on Symbol.asyncIterator that returns an iterator.
  */
-export function isAsyncIterable<T>(it: any): it is AsyncIterable<T> {
-  return typeof it[Symbol.asyncIterator] === 'function';
+export function isAsyncIterable<T>(it: unknown): it is AsyncIterable<T> {
+  return (
+    typeof it === "object" &&
+    it !== null &&
+    Symbol.asyncIterator in it &&
+    typeof it[Symbol.asyncIterator] === "function"
+  );
 }
 
 /**
@@ -12,10 +17,14 @@ export function isAsyncIterable<T>(it: any): it is AsyncIterable<T> {
  * @param {any} it the object to check if it conforms to the Iterable spec.
  * @returnss true if `it` has method on Symbol.iterator that returns an iterator.
  */
-export function isIterable<T>(it: any): it is Iterable<T> {
-  return typeof it[Symbol.iterator] === 'function';
+export function isIterable<T>(it: unknown): it is Iterable<T> {
+  return (
+    typeof it === "object" &&
+    it !== null &&
+    Symbol.iterator in it &&
+    typeof it[Symbol.iterator] === "function"
+  );
 }
-
 
 /**
  * Read all the values produced by the asynchronous iterator into an array and return it.
@@ -34,6 +43,6 @@ export async function accumulate<U>(ait: AsyncIterable<U>): Promise<Array<U>> {
 export function done<T>(): IteratorResult<T> {
   return {
     done: true,
-    value: undefined as any as T
+    value: undefined,
   };
 }

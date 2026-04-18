@@ -2,7 +2,6 @@
   "compilerOptions": {
     "allowJs": false,
     "declaration": true,
-    "baseUrl": "lib",
     "module": "commonjs",
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
@@ -14,7 +13,8 @@
     "strict": true,
     "sourceMap": true,
     "target": "esnext",
-    "lib": ["esnext"]
+    "lib": ["esnext"],
+    "types": ["node"]
   },
   "exclude": [
     "node_modules",
