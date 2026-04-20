@@ -1,6 +1,6 @@
 {
   "name": "concurrent-promise-ts",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "An efficient promise executor",
   "author": "Luciano Leggieri",
   "license": "BSD-3-Clause",
@@ -17,6 +17,10 @@
     "type": "git",
     "url": "git@github.com:lukiano/concurrent-promise-ts.git"
   },
+  "files": [
+    "out/lib/*.js",
+    "out/lib/index.d.ts"
+  ],
   "scripts": {
     "compile": "tsc",
     "build": "npm run verify-formatted && npm run lint && npm run compile",
