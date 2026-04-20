@@ -1,5 +1,5 @@
-import {enqueue} from './queue';
-import {accumulate, empty, isAsyncIterable, isIterable, shield} from './util';
+import { enqueue } from "./queue";
+import { accumulate, empty, isAsyncIterable, isIterable, shield } from "./util";
 
 /**
  * Read all the values from the (a)synchronous iterator, apply the `f` function to each of them, and store the results into an array.
@@ -13,7 +13,11 @@ import {accumulate, empty, isAsyncIterable, isIterable, shield} from './util';
  * @returns {Promise<Array<U>>} An array with the values resulting from applying the function `f` to each value of the iterator.
  * The values in the array will be in the same order as the iterator returned them.
  */
-export async function all<T, U>(source: Iterable<T> | AsyncIterable<T> | Promise<T | Iterable<T>> | T, f: (t: T) => Promise<U | Iterable<U>> | AsyncIterable<U>, concurrency = 32): Promise<Array<U>> {
+export async function all<T, U>(
+  source: Iterable<T> | AsyncIterable<T> | Promise<T | Iterable<T>> | T,
+  f: (t: T) => Promise<U | Iterable<U>> | AsyncIterable<U>,
+  concurrency = 32,
+): Promise<Array<U>> {
   return accumulate(execute(source, f, concurrency, false));
 }
 
@@ -29,9 +33,18 @@ export async function all<T, U>(source: Iterable<T> | AsyncIterable<T> | Promise
  * no more values will be requested from the source iterator.
  * @returns {AsyncIterable<U>}
  */
-export function execute<T, U>(source: Iterable<T> | AsyncIterable<T> | Promise<T | Iterable<T>> | T, f: (t: T) => Promise<U | Iterable<U>> | AsyncIterable<U>, concurrency = 32, backPressure = false): AsyncIterable<U> {
-  if (Number.isNaN(concurrency) || !Number.isSafeInteger(concurrency) || concurrency <= 0) {
-    throw new Error('Invalid concurrency value');
+export function execute<T, U>(
+  source: Iterable<T> | AsyncIterable<T> | Promise<T | Iterable<T>> | T,
+  f: (t: T) => Promise<U | Iterable<U>> | AsyncIterable<U>,
+  concurrency = 32,
+  backPressure = false,
+): AsyncIterable<U> {
+  if (
+    Number.isNaN(concurrency) ||
+    !Number.isSafeInteger(concurrency) ||
+    concurrency <= 0
+  ) {
+    throw new Error("Invalid concurrency value");
   }
 
   if (source === null || source === undefined) {

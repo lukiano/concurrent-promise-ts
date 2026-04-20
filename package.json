@@ -20,7 +20,7 @@
   "scripts": {
     "compile": "tsc",
     "build": "npm run verify-formatted && npm run lint && npm run compile",
-    "format": "npx prettier lib/ --write",
+    "format": "npx prettier lib/ --write && npx prettier test/ --write",
     "lint": "npx eslint",
     "verify-formatted": "npx prettier lib/ --check",
     "pretest": "npm run build",

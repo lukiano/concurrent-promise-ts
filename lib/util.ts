@@ -32,7 +32,9 @@ export function isIterable<T>(it: unknown): it is Iterable<T> {
  * @param {AsyncIterator<U>} source iterator to read the values from.
  * @returns {Promise<Array<U>>} a promise fulfilled with the an array after all the values of the iterator have been added to it, or rejected by any error produced by the source iterator.
  */
-export async function accumulate<U>(source: AsyncIterable<U>): Promise<Array<U>> {
+export async function accumulate<U>(
+  source: AsyncIterable<U>,
+): Promise<Array<U>> {
   const results: Array<U> = [];
   for await (const value of source) {
     results.push(value);
@@ -40,7 +42,9 @@ export async function accumulate<U>(source: AsyncIterable<U>): Promise<Array<U>>
   return results;
 }
 
-export async function* shield<T>(source: Promise<T | Iterable<T>> | T): AsyncIterable<T> {
+export async function* shield<T>(
+  source: Promise<T | Iterable<T>> | T,
+): AsyncIterable<T> {
   const value = await source;
   if (isIterable(value)) {
     yield* value;
@@ -49,5 +53,4 @@ export async function* shield<T>(source: Promise<T | Iterable<T>> | T): AsyncIte
   }
 }
 
-export async function* empty<T>(): AsyncIterable<T> {
-}
+export async function* empty<T>(): AsyncIterable<T> {}
